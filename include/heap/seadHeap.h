@@ -44,6 +44,7 @@ public:
 
     SEAD_RTTI_BASE(Heap)
 
+
     virtual void destroy() = 0;
     virtual size_t adjust() = 0;
     virtual void* tryAlloc(size_t size, s32 alignment) = 0;
