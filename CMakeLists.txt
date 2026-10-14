@@ -129,6 +129,7 @@ add_library(sead OBJECT
   modules/src/heap/seadArena.cpp
   modules/src/heap/seadDisposer.cpp
   modules/src/heap/seadExpHeap.cpp
+  modules/src/heap/seadFrameHeap.cpp
   modules/src/heap/seadHeap.cpp
   modules/src/heap/seadHeapMgr.cpp
 
