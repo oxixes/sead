@@ -23,7 +23,7 @@ public:
                              HeapDirection direction = cHeapDirection_Forward,
                              bool enable_lock = false);
 
-    static size_t getManagementAreaSize(s32);
+    static size_t getManagementAreaSize(s32 alignment);
 
     void restoreState(const State& state);
     void freeHead();
@@ -58,6 +58,8 @@ protected:
     void initialize_();
     void* getAreaStart_() const;
     void* getAreaEnd_() const;
+    size_t adjustFront_();
+    size_t adjustBack_();
 
     State mState;
 };
