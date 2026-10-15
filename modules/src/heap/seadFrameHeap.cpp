@@ -125,7 +125,8 @@ void FrameHeap::freeHead()
     }
     else
     {
-        dispose_(mState.mTailPtr, PtrUtil::addOffset(mStart, static_cast<intptr_t>(mSize - sizeof(FrameHeap))));
+        dispose_(mState.mTailPtr,
+                 PtrUtil::addOffset(mStart, static_cast<intptr_t>(mSize - sizeof(FrameHeap))));
         mState.mTailPtr = getAreaEnd_();
     }
 }
