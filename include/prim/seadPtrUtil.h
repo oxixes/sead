@@ -12,7 +12,7 @@ public:
 
     static void* roundUpPow2(const void* ptr, u32 n)
     {
-        const uintptr_t result = uintptr_t(ptr) + (n - uintptr_t(ptr) % n) % n;
+        const uintptr_t result = (uintptr_t(ptr) + (n - 1)) & ~uintptr_t(n - 1);
         return reinterpret_cast<void*>(result);
     }
 
@@ -24,7 +24,7 @@ public:
 
     static void* roundDownPow2(const void* ptr, u32 n)
     {
-        const uintptr_t result = uintptr_t(ptr) - uintptr_t(ptr) % n;
+        const uintptr_t result = uintptr_t(ptr) & ~uintptr_t(n - 1);
         return reinterpret_cast<void*>(result);
     }
 
