@@ -59,7 +59,7 @@ public:
     virtual uintptr_t getEndAddress() const = 0;
     virtual size_t getSize() const = 0;
     virtual size_t getFreeSize() const = 0;
-    virtual size_t getMaxAllocatableSize(int alignment) const = 0;
+    virtual size_t getMaxAllocatableSize(s32 alignment) const = 0;
     virtual bool isInclude(const void*) const = 0;
     virtual bool isEmpty() const = 0;
     virtual bool isFreeable() const = 0;
@@ -67,8 +67,8 @@ public:
     virtual bool isAdjustable() const = 0;
 
     virtual void dump() const {}
-    virtual void dumpYAML(WriteStream& stream, int indentation) const;
-    void dumpTreeYAML(WriteStream& stream, int) const;
+    virtual void dumpYAML(WriteStream& stream, s32 indentation) const;
+    void dumpTreeYAML(WriteStream& stream, s32 indentation) const;
 
 #ifdef SEAD_DEBUG
     void listenPropertyEvent(const hostio::PropertyEvent* event) override;
@@ -85,6 +85,7 @@ public:
     void appendDisposer_(IDisposer* disposer);
     void removeDisposer_(IDisposer* disposer);
     Heap* findContainHeap_(const void* ptr);
+    void checkAccessThread_() const;
 
     void* alloc(size_t size, s32 alignment = sizeof(void*))
     {

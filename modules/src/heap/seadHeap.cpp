@@ -1,6 +1,9 @@
 #include <heap/seadHeap.h>
 #include <heap/seadHeapMgr.h>
 #include <prim/seadScopedLock.h>
+#include <stream/seadStream.h>
+
+// TODO FrameHeap change int alignment and indentation to s32
 
 namespace sead
 {
@@ -103,6 +106,71 @@ void Heap::pushBackChild_(Heap* child)
     mChildren.pushBack(child);
 }
 
+void Heap::checkAccessThread_() const
+{
+    // This would presumably check if the current thread is allowed to access this heap,
+    // but in a release build, it is empty.
+}
+
+void Heap::dumpTreeYAML(WriteStream& stream, s32 indentation) const
+{
+    dumpYAML(stream, indentation);
+
+    FixedSafeString<128> str("");
+    str.append(' ', indentation);
+    str.appendWithFormat("  children:\n");
+    stream.writeDecorationText(str);
+
+    for (auto& child : mChildren)
+        child.dumpTreeYAML(stream, indentation + 4);
+}
+
+void Heap::dumpYAML(WriteStream& stream, s32 indentation) const
+{
+    ConditionalScopedLock<CriticalSection> lock(&mCS, isLockEnabled());
+
+    FixedSafeString<128> str("");
+
+    str.append(' ', indentation);
+    str.appendWithFormat("- name: \"%s\"\n", getName().cstr());
+    stream.writeDecorationText(str);
+
+    str.clear();
+    str.append(' ', indentation);
+    str.appendWithFormat("  start_address: 0x%016llX\n", getStartAddress());
+    stream.writeDecorationText(str);
+
+    str.clear();
+    str.append(' ', indentation);
+    str.appendWithFormat("  end_address: 0x%016llX\n", getEndAddress());
+    stream.writeDecorationText(str);
+
+    str.clear();
+    str.append(' ', indentation);
+    str.appendWithFormat("  parent: %s\n", mParent ? mParent->getName().cstr() : "--");
+    stream.writeDecorationText(str);
+
+    str.clear();
+    str.append(' ', indentation);
+    str.appendWithFormat("  direction: %s\n",
+                         mDirection == cHeapDirection_Forward ? "Forward" : "Reverse");
+    stream.writeDecorationText(str);
+
+    str.clear();
+    str.append(' ', indentation);
+    str.appendWithFormat("  size: %llu\n", getSize());
+    stream.writeDecorationText(str);
+
+    str.clear();
+    str.append(' ', indentation);
+    str.appendWithFormat("  free_size: %llu\n", getFreeSize());
+    stream.writeDecorationText(str);
+
+    str.clear();
+    str.append(' ', indentation);
+    str.appendWithFormat("  max_allocatable_size: %llu\n", getMaxAllocatableSize(sizeof(void*)));
+    stream.writeDecorationText(str);
+}
 
 void Heap::genInformation_(hostio::Context*) {}
 
