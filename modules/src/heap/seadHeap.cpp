@@ -3,8 +3,6 @@
 #include <prim/seadScopedLock.h>
 #include <stream/seadStream.h>
 
-// TODO FrameHeap change int alignment and indentation to s32
-
 namespace sead
 {
 Heap::Heap(const SafeString& name, Heap* parent, void* address, size_t size,
