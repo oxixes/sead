@@ -44,6 +44,14 @@ FrameHeap::~FrameHeap()
     destruct_();
 }
 
+FrameHeap* FrameHeap::create(size_t size, const SafeString& name, Heap* parent, s32 alignment,
+                             HeapDirection direction, bool enable_lock)
+{
+    FrameHeap* heap = tryCreate(size, name, parent, alignment, direction, enable_lock);
+    SEAD_ASSERT(heap);
+    return heap;
+}
+
 FrameHeap* FrameHeap::tryCreate(size_t size, const SafeString& name, Heap* parent, s32 alignment,
                                 HeapDirection direction, bool enable_lock)
 {
@@ -84,66 +92,34 @@ FrameHeap* FrameHeap::tryCreate(size_t size, const SafeString& name, Heap* paren
     return heap;
 }
 
-FrameHeap* FrameHeap::create(size_t size, const SafeString& name, Heap* parent, s32 alignment,
-                             HeapDirection direction, bool enable_lock)
+void FrameHeap::initialize_()
 {
-    FrameHeap* heap = tryCreate(size, name, parent, alignment, direction, enable_lock);
-    SEAD_ASSERT(heap);
-    return heap;
+    ConditionalScopedLock<CriticalSection> lock(&mCS, isLockEnabled());
+    mState.mHeadPtr = getAreaStart_();
+    mState.mTailPtr = getAreaEnd_();
+}
+
+void* FrameHeap::getAreaStart_() const
+{
+    if (mDirection == cHeapDirection_Forward)
+    {
+        return PtrUtil::addOffset(mStart, sizeof(FrameHeap));
+    }
+
+    return mStart;
+}
+
+void* FrameHeap::getAreaEnd_() const
+{
+    if (mDirection == cHeapDirection_Forward)
+        return PtrUtil::addOffset(mStart, static_cast<intptr_t>(mSize));
+
+    return PtrUtil::addOffset(mStart, static_cast<intptr_t>(mSize - sizeof(FrameHeap)));
 }
 
 size_t FrameHeap::getManagementAreaSize(s32 alignment)
 {
     return alignment + sizeof(FrameHeap);
-}
-
-void FrameHeap::restoreState(const State& state)
-{
-    ConditionalScopedLock<CriticalSection> lock(&mCS, isLockEnabled());
-    if (state.mHeadPtr != nullptr && state.mHeadPtr != mState.mHeadPtr &&
-        isInclude(state.mHeadPtr) && state.mHeadPtr <= mState.mHeadPtr)
-    {
-        dispose_(state.mHeadPtr, mState.mHeadPtr);
-        mState.mHeadPtr = state.mHeadPtr;
-    }
-
-    if (state.mTailPtr != nullptr && state.mTailPtr != mState.mTailPtr &&
-        isInclude(state.mTailPtr) && state.mTailPtr >= mState.mTailPtr)
-    {
-        dispose_(mState.mTailPtr, state.mTailPtr);
-        mState.mTailPtr = state.mTailPtr;
-    }
-}
-
-void FrameHeap::freeHead()
-{
-    ConditionalScopedLock<CriticalSection> lock(&mCS, isLockEnabled());
-    if (mDirection == cHeapDirection_Forward)
-    {
-        dispose_(PtrUtil::addOffset(mStart, sizeof(FrameHeap)), mState.mHeadPtr);
-        mState.mHeadPtr = getAreaStart_();
-    }
-    else
-    {
-        dispose_(mState.mTailPtr,
-                 PtrUtil::addOffset(mStart, static_cast<intptr_t>(mSize - sizeof(FrameHeap))));
-        mState.mTailPtr = getAreaEnd_();
-    }
-}
-
-void FrameHeap::freeTail()
-{
-    ConditionalScopedLock<CriticalSection> lock(&mCS, isLockEnabled());
-    if (mDirection == cHeapDirection_Forward)
-    {
-        dispose_(mState.mTailPtr, PtrUtil::addOffset(mStart, static_cast<intptr_t>(mSize)));
-        mState.mTailPtr = getAreaEnd_();
-    }
-    else
-    {
-        dispose_(mStart, mState.mHeadPtr);
-        mState.mHeadPtr = getAreaStart_();
-    }
 }
 
 void FrameHeap::destroy()
@@ -153,6 +129,24 @@ void FrameHeap::destroy()
     this->~FrameHeap();
     if (parent && parent->isFreeable())
         parent->free(start);
+}
+
+size_t FrameHeap::getSize() const
+{
+    return mSize;
+}
+
+bool FrameHeap::isInclude(const void* p_void) const
+{
+    return PtrUtil::isInclude(p_void, getAreaStart_(), getAreaEnd_());
+}
+
+void FrameHeap::freeAll()
+{
+    ConditionalScopedLock<CriticalSection> lock(&mCS, isLockEnabled());
+    dispose_(nullptr, nullptr);
+    mState.mHeadPtr = getAreaStart_();
+    mState.mTailPtr = getAreaEnd_();
 }
 
 size_t FrameHeap::adjust()
@@ -173,6 +167,32 @@ size_t FrameHeap::adjust()
     if (mState.mHeadPtr == getAreaStart_())
         return adjustFront_();
     return mSize;
+}
+
+size_t FrameHeap::adjustBack_()
+{
+    size_t newSize = PtrUtil::diff(mState.mHeadPtr, reinterpret_cast<void*>(getStartAddress()));
+    if (mParent->resizeBack(mStart, newSize) == nullptr)
+        return mSize;
+
+    mState.mTailPtr = mState.mHeadPtr;
+    mSize = newSize;
+
+    return newSize;
+}
+
+size_t FrameHeap::adjustFront_()
+{
+    size_t newSize = PtrUtil::diff(reinterpret_cast<void*>(getEndAddress()), mState.mTailPtr);
+    if (mParent->resizeFront(mStart, newSize) == nullptr)
+        return mSize;
+
+    mSize = newSize;
+    std::atomic_thread_fence(std::memory_order_seq_cst);
+    mState.mHeadPtr = mState.mTailPtr;
+    mStart = mState.mTailPtr;
+
+    return newSize;
 }
 
 void* FrameHeap::tryAlloc(size_t size, s32 alignment)
@@ -239,12 +259,53 @@ void* FrameHeap::resizeBack(void*, size_t)
     return nullptr;
 }
 
-void FrameHeap::freeAll()
+void FrameHeap::freeHead()
 {
     ConditionalScopedLock<CriticalSection> lock(&mCS, isLockEnabled());
-    dispose_(nullptr, nullptr);
-    mState.mHeadPtr = getAreaStart_();
-    mState.mTailPtr = getAreaEnd_();
+    if (mDirection == cHeapDirection_Forward)
+    {
+        dispose_(PtrUtil::addOffset(mStart, sizeof(FrameHeap)), mState.mHeadPtr);
+        mState.mHeadPtr = getAreaStart_();
+    }
+    else
+    {
+        dispose_(mState.mTailPtr,
+                 PtrUtil::addOffset(mStart, static_cast<intptr_t>(mSize - sizeof(FrameHeap))));
+        mState.mTailPtr = getAreaEnd_();
+    }
+}
+
+void FrameHeap::freeTail()
+{
+    ConditionalScopedLock<CriticalSection> lock(&mCS, isLockEnabled());
+    if (mDirection == cHeapDirection_Forward)
+    {
+        dispose_(mState.mTailPtr, PtrUtil::addOffset(mStart, static_cast<intptr_t>(mSize)));
+        mState.mTailPtr = getAreaEnd_();
+    }
+    else
+    {
+        dispose_(mStart, mState.mHeadPtr);
+        mState.mHeadPtr = getAreaStart_();
+    }
+}
+
+void FrameHeap::restoreState(const State& state)
+{
+    ConditionalScopedLock<CriticalSection> lock(&mCS, isLockEnabled());
+    if (state.mHeadPtr != nullptr && state.mHeadPtr != mState.mHeadPtr &&
+        isInclude(state.mHeadPtr) && state.mHeadPtr <= mState.mHeadPtr)
+    {
+        dispose_(state.mHeadPtr, mState.mHeadPtr);
+        mState.mHeadPtr = state.mHeadPtr;
+    }
+
+    if (state.mTailPtr != nullptr && state.mTailPtr != mState.mTailPtr &&
+        isInclude(state.mTailPtr) && state.mTailPtr >= mState.mTailPtr)
+    {
+        dispose_(mState.mTailPtr, state.mTailPtr);
+        mState.mTailPtr = state.mTailPtr;
+    }
 }
 
 uintptr_t FrameHeap::getStartAddress() const
@@ -255,11 +316,6 @@ uintptr_t FrameHeap::getStartAddress() const
 uintptr_t FrameHeap::getEndAddress() const
 {
     return reinterpret_cast<uintptr_t>(mStart) + mSize;
-}
-
-size_t FrameHeap::getSize() const
-{
-    return mSize;
 }
 
 size_t FrameHeap::getFreeSize() const
@@ -279,38 +335,6 @@ size_t FrameHeap::getMaxAllocatableSize(int alignment) const
         return PtrUtil::diff(mState.mTailPtr, alignedHead);
 
     return 0;
-}
-
-bool FrameHeap::isInclude(const void* p_void) const
-{
-    return PtrUtil::isInclude(p_void, getAreaStart_(), getAreaEnd_());
-}
-
-bool FrameHeap::isEmpty() const
-{
-    return mState.mHeadPtr == getAreaStart_() && mState.mTailPtr == getAreaEnd_();
-}
-
-bool FrameHeap::isFreeable() const
-{
-    return false;
-}
-
-bool FrameHeap::isResizable() const
-{
-    return false;
-}
-
-bool FrameHeap::isAdjustable() const
-{
-    return true;
-}
-
-void FrameHeap::dump() const
-{
-    ConditionalScopedLock<CriticalSection> lock(&mCS, isLockEnabled());
-    // The output is stripped from release builds and only the lock remains. A debug build would
-    // have to output something
 }
 
 void FrameHeap::dumpYAML(WriteStream& stream, int i) const
@@ -334,60 +358,36 @@ void FrameHeap::dumpYAML(WriteStream& stream, int i) const
     stream.writeDecorationText(str);
 }
 
+void FrameHeap::dump() const
+{
+    ConditionalScopedLock<CriticalSection> lock(&mCS, isLockEnabled());
+    // The output is stripped from release builds and only the lock remains. A debug build would
+    // have to output something
+}
+
 void FrameHeap::genInformation_(hostio::Context* context)
 {
     Heap::genInformation_(context);
 }
 
-void FrameHeap::initialize_()
+bool FrameHeap::isEmpty() const
 {
-    ConditionalScopedLock<CriticalSection> lock(&mCS, isLockEnabled());
-    mState.mHeadPtr = getAreaStart_();
-    mState.mTailPtr = getAreaEnd_();
+    return mState.mHeadPtr == getAreaStart_() && mState.mTailPtr == getAreaEnd_();
 }
 
-void* FrameHeap::getAreaStart_() const
+bool FrameHeap::isFreeable() const
 {
-    if (mDirection == cHeapDirection_Forward)
-    {
-        return PtrUtil::addOffset(mStart, sizeof(FrameHeap));
-    }
-
-    return mStart;
+    return false;
 }
 
-void* FrameHeap::getAreaEnd_() const
+bool FrameHeap::isResizable() const
 {
-    if (mDirection == cHeapDirection_Forward)
-        return PtrUtil::addOffset(mStart, static_cast<intptr_t>(mSize));
-
-    return PtrUtil::addOffset(mStart, static_cast<intptr_t>(mSize - sizeof(FrameHeap)));
+    return false;
 }
 
-size_t FrameHeap::adjustFront_()
+bool FrameHeap::isAdjustable() const
 {
-    size_t newSize = PtrUtil::diff(reinterpret_cast<void*>(getEndAddress()), mState.mTailPtr);
-    if (mParent->resizeFront(mStart, newSize) == nullptr)
-        return mSize;
-
-    mSize = newSize;
-    std::atomic_thread_fence(std::memory_order_seq_cst);
-    mState.mHeadPtr = mState.mTailPtr;
-    mStart = mState.mTailPtr;
-
-    return newSize;
-}
-
-size_t FrameHeap::adjustBack_()
-{
-    size_t newSize = PtrUtil::diff(mState.mHeadPtr, reinterpret_cast<void*>(getStartAddress()));
-    if (mParent->resizeBack(mStart, newSize) == nullptr)
-        return mSize;
-
-    mState.mTailPtr = mState.mHeadPtr;
-    mSize = newSize;
-
-    return newSize;
+    return true;
 }
 
 }  // namespace sead
