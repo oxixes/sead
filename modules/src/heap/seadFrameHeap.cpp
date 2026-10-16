@@ -324,7 +324,7 @@ size_t FrameHeap::getFreeSize() const
     return PtrUtil::diff(mState.mTailPtr, mState.mHeadPtr);
 }
 
-size_t FrameHeap::getMaxAllocatableSize(int alignment) const
+size_t FrameHeap::getMaxAllocatableSize(s32 alignment) const
 {
     if ((Mathi::abs(alignment) - 1) & Mathi::abs(alignment))
         return 0;
@@ -337,23 +337,23 @@ size_t FrameHeap::getMaxAllocatableSize(int alignment) const
     return 0;
 }
 
-void FrameHeap::dumpYAML(WriteStream& stream, int i) const
+void FrameHeap::dumpYAML(WriteStream& stream, s32 indentation) const
 {
     ConditionalScopedLock<CriticalSection> lock(&mCS, isLockEnabled());
-    Heap::dumpYAML(stream, i);
+    Heap::dumpYAML(stream, indentation);
 
     FixedSafeString<128> str("");
-    str.append(' ', i);
+    str.append(' ', indentation);
     str.appendWithFormat("  heap_type: FrameHeap\n");
     stream.writeDecorationText(str);
 
     str.clear();
-    str.append(' ', i);
+    str.append(' ', indentation);
     str.appendWithFormat("  head_ptr: 0x%016llX\n", mState.mHeadPtr);
     stream.writeDecorationText(str);
 
     str.clear();
-    str.append(' ', i);
+    str.append(' ', indentation);
     str.appendWithFormat("  tail_ptr: 0x%016llX\n", mState.mTailPtr);
     stream.writeDecorationText(str);
 }
