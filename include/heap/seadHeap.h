@@ -67,7 +67,7 @@ public:
     virtual bool isAdjustable() const = 0;
 
     virtual void dump() const {}
-    virtual void dumpYAML(WriteStream& stream, int) const;
+    virtual void dumpYAML(WriteStream& stream, int indentation) const;
     void dumpTreeYAML(WriteStream& stream, int) const;
 
 #ifdef SEAD_DEBUG
@@ -75,10 +75,13 @@ public:
     void genMessage(hostio::Context*) override;
 #endif
     virtual void genInformation_(hostio::Context*);
-    virtual void makeMetaString_(BufferedSafeString*);
+    virtual void makeMetaString_(BufferedSafeString* str);
 
     virtual void pushBackChild_(Heap* child);
+    void eraseChild_(Heap* child);
 
+    void dispose_(const void* start, const void* end);
+    void destruct_();
     void appendDisposer_(IDisposer* disposer);
     void removeDisposer_(IDisposer* disposer);
     Heap* findContainHeap_(const void* ptr);
@@ -93,6 +96,7 @@ public:
     }
 
     void enableLock(bool on) { mFlag.changeBit(Flag::cEnableLock, on); }
+    void enableDisposing(bool on) { mFlag.changeBit(Flag::cDisposing, on); }
     void enableWarning(bool on) { mFlag.changeBit(Flag::cEnableWarning, on); }
     void enableDebugFillSystem(bool on) { mFlag.changeBit(Flag::cEnableDebugFillSystem, on); }
     void enableDebugFillUser(bool on) { mFlag.changeBit(Flag::cEnableDebugFillUser, on); }
@@ -104,6 +108,24 @@ public:
 
     sead::CriticalSection& getCriticalSection() { return mCS; }
 
+    bool lock()
+    {
+        if (!isLockEnabled())
+            return false;
+
+        mCS.lock();
+        return true;
+    }
+
+    bool unlock()
+    {
+        if (!isLockEnabled())
+            return false;
+
+        mCS.unlock();
+        return true;
+    }
+
     using HeapList = OffsetList<Heap>;
     using DisposerList = OffsetList<IDisposer>;
 
@@ -114,7 +136,7 @@ public:
     ListNode mListNode;
     DisposerList mDisposerList;
     HeapDirection mDirection;
-    CriticalSection mCS;
+    mutable CriticalSection mCS;
     BitFlag16 mFlag;
     u16 mHeapCheckTag;
 #ifdef SEAD_DEBUG

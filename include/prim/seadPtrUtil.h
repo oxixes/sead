@@ -52,7 +52,7 @@ public:
 
     static bool isInclude(const void* ptr, const void* begin, const void* end)
     {
-        return uintptr_t(begin) <= uintptr_t(ptr) && uintptr_t(ptr) <= uintptr_t(end);
+        return uintptr_t(begin) <= uintptr_t(ptr) && uintptr_t(ptr) < uintptr_t(end);
     }
 
     static bool isAligned(const void* ptr, s32 alignment)

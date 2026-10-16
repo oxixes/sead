@@ -75,6 +75,7 @@ public:
 
 private:
     friend class ScopedCurrentHeapSetter;
+    friend class Heap;
 
     /// Set the current heap to the specified heap and returns the previous "current heap".
     Heap* setCurrentHeap_(Heap* heap);
