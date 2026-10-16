@@ -48,7 +48,8 @@ FrameHeap* FrameHeap::create(size_t size, const SafeString& name, Heap* parent, 
                              HeapDirection direction, bool enable_lock)
 {
     FrameHeap* heap = tryCreate(size, name, parent, alignment, direction, enable_lock);
-    SEAD_ASSERT(heap);
+    SEAD_ASSERT_MSG(heap, "FrameHeap::create failed. size: %zu, alignment: %d, name: %s", size,
+                    alignment, name.cstr());
     return heap;
 }
 
