@@ -40,14 +40,14 @@ public:
     uintptr_t getEndAddress() const override;
     size_t getSize() const override;
     size_t getFreeSize() const override;
-    size_t getMaxAllocatableSize(int alignment) const override;
+    size_t getMaxAllocatableSize(s32 alignment) const override;
     bool isInclude(const void* p_void) const override;
     bool isEmpty() const override;
     bool isFreeable() const override;
     bool isResizable() const override;
     bool isAdjustable() const override;
     void dump() const override;
-    void dumpYAML(WriteStream& stream, int i) const override;
+    void dumpYAML(WriteStream& stream, s32 indentation) const override;
     void genInformation_(hostio::Context* context) override;
 
 protected:
