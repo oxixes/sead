@@ -23,7 +23,7 @@ Heap::Heap(const SafeString& name, Heap* parent, void* address, size_t size,
     ConditionalScopedLock<CriticalSection> lock(&mCS, isLockEnabled());
 
     mChildren.initOffset(offsetof(Heap, mListNode));
-    mDisposerList.initOffset(offsetof(IDisposer, mListNode));
+    mDisposerList.initOffset(static_cast<s32>(IDisposer::getListNodeOffset()));
 }
 
 Heap::~Heap() = default;
