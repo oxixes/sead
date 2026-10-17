@@ -18,6 +18,9 @@ protected:
     u16 mHeapCheckTag;
     u16 mOffset;
     size_t mSize;
+
+private:
+    friend class ExpHeap;
 };
 
 using MemBlockList = OffsetList<MemBlock>;

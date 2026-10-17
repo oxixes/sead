@@ -34,6 +34,8 @@ public:
                            bool enable_lock = false);
     static ExpHeap* create(void* address, size_t size, const SafeString& name,
                            bool enable_lock = false);
+    static ExpHeap* create(void* address, size_t size, const SafeString& name, Heap* parent,
+                           bool enable_lock = false);
 
     static ExpHeap* tryCreate(size_t size, const SafeString& name, Heap* parent,
                               s32 alignment = sizeof(void*),
@@ -41,13 +43,20 @@ public:
                               bool enable_lock = false);
     static ExpHeap* tryCreate(void* address, size_t size, const SafeString& name,
                               bool enable_lock = false);
+    static ExpHeap* tryCreate(void* address, size_t size, const SafeString& name, Heap* parent,
+                              bool enable_lock = false);
 
-    static size_t getManagementAreaSize(s32);
+    static size_t getManagementAreaSize(s32 alignment);
 
     void destroy() override;
     size_t adjust() override;
     void* tryAlloc(size_t size, s32 alignment) override;
     void free(void* ptr) override;
+#if SEAD_HEAP_FREEANDGETALLOCATABLESIZE_VIRTUAL
+    size_t freeAndGetAllocatableSize(void* ptr, s32 alignment) override;
+#else
+    size_t freeAndGetAllocatableSize(void* ptr, s32 alignment);
+#endif
     void* resizeFront(void* p_void, size_t size) override;
     void* resizeBack(void* p_void, size_t size) override;
     void* tryRealloc(void* ptr, size_t size, s32 alignment) override;
@@ -56,14 +65,14 @@ public:
     uintptr_t getEndAddress() const override;
     size_t getSize() const override;
     size_t getFreeSize() const override;
-    size_t getMaxAllocatableSize(int alignment) const override;
+    size_t getMaxAllocatableSize(s32 alignment) const override;
     bool isInclude(const void* p_void) const override;
     bool isEmpty() const override;
     bool isFreeable() const override;
     bool isResizable() const override;
     bool isAdjustable() const override;
     void dump() const override;
-    void dumpYAML(WriteStream& stream, int i) const override;
+    void dumpYAML(WriteStream& stream, s32 indentation) const override;
     void genInformation_(hostio::Context* context) override;
 
     virtual s32 destroyAndGetAllocatableSize(s32);
@@ -85,7 +94,7 @@ public:
 
 protected:
     ExpHeap(const SafeString& name, Heap* parent, void* address, size_t size,
-            HeapDirection direction, bool);
+            HeapDirection direction, bool enable_lock);
     ~ExpHeap() override;
 
     static void doCreate(ExpHeap*, Heap*);
@@ -109,7 +118,10 @@ protected:
     MemBlock* allocFromTail_(size_t);
     MemBlock* allocFromTail_(size_t, s32);
 
-    static s32 compareMemBlockAddr_(const MemBlock*, const MemBlock*);
+    void* realloc_(void* ptr, u8* data, size_t copy_size, size_t new_size, s32 alignment);
+
+    static s32 compareMemBlockAddr_(const MemBlock* a, const MemBlock* b);
+    static const char* getFindFreeBlockModeString_(FindFreeBlockMode mode);
 
     SizedEnum<AllocMode, u8> mAllocMode;
     SizedEnum<FindFreeBlockMode, u8> mFindFreeBlockMode;
