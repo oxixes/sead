@@ -29,7 +29,7 @@ class PropertyEvent;
 class Heap : public IDisposer, public INamable, public hostio::Reflexible
 {
 public:
-    SEAD_ENUM(Flag, cEnableLock, cDisposing, cEnableWarning, cEnableDebugFillSystem,
+    SEAD_ENUM(Flag, cEnableLock, cDisposing, cEnableWarning, cExternalMemory, cEnableDebugFillSystem,
               cEnableDebugFillUser)
 
     enum HeapDirection
