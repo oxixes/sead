@@ -97,9 +97,9 @@ protected:
             HeapDirection direction, bool enable_lock);
     ~ExpHeap() override;
 
-    static void doCreate(ExpHeap*, Heap*);
+    static void doCreate(ExpHeap* heap, Heap* parent);
 
-    static void createMaxSizeFreeMemBlock_(ExpHeap*);
+    static void createMaxSizeFreeMemBlock_(ExpHeap* heap);
     MemBlock* findFreeMemBlockFromHead_(size_t, FindMode) const;
     MemBlock* findFreeMemBlockFromHead_(size_t, s32, FindMode) const;
     MemBlock* findFreeMemBlockFromTail_(size_t, FindMode) const;
@@ -107,8 +107,11 @@ protected:
     MemBlock* findLastMemBlockIfFree_();
     MemBlock* findFirstMemBlockIfFree_();
 
-    void pushToUseList_(MemBlock*);
-    void pushToFreeList_(MemBlock*);
+    void pushToUseList_(MemBlock* block);
+    MemBlock* pushToFreeList_(MemBlock* block);
+    bool findNeighborFreeMemBlocks_(MemBlock* block, MemBlock** prev, MemBlock** next) const;
+    bool findNeighborFreeMemBlocksByIterating_(MemBlock* block, MemBlock** prev,
+                                               MemBlock** next) const;
 
     size_t adjustBack_();
     size_t adjustFront_();
